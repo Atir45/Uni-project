@@ -3,6 +3,7 @@ import os
 import random
 pygame.init()
 pygame.font.init()
+#variables
 WIDTH = 800
 HEIGHT = 800
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -12,9 +13,17 @@ RED = (255, 0, 0)
 FPS = 60
 tile_size = 50
 game_over = 0
+main_menu = True
+#menu images
+restart_image = pygame.transform.scale(pygame.image.load(os.path.join('restart_button.png')),(140,70))
+start_img = pygame.transform.scale(pygame.image.load(os.path.join('start_button.png')),(140,70))
+end_img = pygame.transform.scale(pygame.image.load(os.path.join('end_button.png')),(140,70))
+#bg images
 primary_background_image = pygame.transform.scale(pygame.image.load(os.path.join('back.png')), (800,800))
+#Sprites group
 enemy_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
+#text fonts
 font_small = pygame.font.SysFont('Lucida Sans', 20)
 font_big = pygame.font.SysFont('Lucida Sans' , 60)
 #draws grids for easy world building
@@ -23,40 +32,42 @@ def draw_grid():
         pygame.draw.line(WIN, (255,255,255), (0,line * tile_size),(WIDTH , line * tile_size))
         pygame.draw.line(WIN, (255,255,255), (line * tile_size, 0),(line * tile_size, HEIGHT))
 
-def game_over_text(text , font , text_color, x , y):
+def draw_text(text , font , text_color, x , y):
     img = font.render(text, True, text_color)
     WIN.blit(img , (x,y))
 
+#buttons
+class button():
+    def __init__(self,x,y,image):
+        self.image = image
+        self.rect= self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y 
+        self.clicked = False
 
+    def draw(self):
+        action = False
+        #get mouse position 
+        pos = pygame.mouse.get_pos()
+
+        #check mouse over and click condition
+        if self.rect.collidepoint(pos):
+            if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+                action = True
+                self.clicked = True
+        if pygame.mouse.get_pressed()[0] == 0:
+            self.clicked = False
+                
+
+        WIN.blit(self.image, self.rect)
+        return action
 
 
 #draws player
 class Player():
     def __init__(self, x , y):
-        Health = 100
-        width_character = 40
-        height_character = 90
-        self.images_right = []
-        self.images_left = []
-        self.index = 0
-        self.counter = 0
-        for num in range(1,7):
-            img_right = (pygame.image.load(os.path.join(f'GOJO{num}.png')))
-            img_right = pygame.transform.scale(img_right,(width_character , height_character))
-            img_left = pygame.transform.flip(img_right, True, False)
-            self.images_right.append(img_right)
-            self.images_left.append(img_left)
-        self.image = self.images_right[self.index]
-
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
-        self.width= self.image.get_width()
-        self.height= self.image.get_height()
-        self.vel_y = 0
-        self.jumped = False
-        self.direction = 0
-    
+        self.reset(x,y)
+      
     def update(self,game_over):
         dx = 0
         dy = 0
@@ -64,7 +75,7 @@ class Player():
         if game_over == 0:
         #get keypress
             key = pygame.key.get_pressed()
-            if key[pygame.K_SPACE] and self.jumped == False:
+            if key[pygame.K_SPACE] and self.jumped == False and self.in_air == False:
                 self.vel_y = -18
                 self.jumped = True
                 if self.rect.y < 0:
@@ -112,7 +123,7 @@ class Player():
             dy += self.vel_y
 
             #check for collison 
-            
+            self.in_air = True
             for tile in world.tile_list:
                 #check for collision in x direction
                 if tile[1].colliderect(self.rect.x + dx , self.rect.y , self.width , self.height):
@@ -123,14 +134,16 @@ class Player():
                     if self.vel_y < 0:
                         dy = tile[1].bottom - self.rect.top
                         self.vel_y = 0
+                    #falling
                     elif self.vel_y >= 0:
                         dy = tile[1].top - self.rect.bottom
                         self.vel_y = 0
+                        self.in_air = False
             
             #check for collision with enemies
-            if pygame.sprite.spritecollide(self, enemy_group, False):
+            if pygame.sprite.spritecollide(self, enemy_group, False) :
                 game_over = -1
-               
+              
             #collision with lava
             if pygame.sprite.spritecollide(self, lava_group, False):
                 game_over = -1
@@ -142,11 +155,41 @@ class Player():
             self.rect.y += dy
 
             self.rect.y = max(0, min(self.rect.y, HEIGHT - self.height))
+        elif game_over == -1:
+            self.image = self.dead_image
+            if self.rect.y > 100:
+                self.rect.y -= 5 
 
-            if self.rect.bottom > HEIGHT:
-                self.rect.bottom = HEIGHT
-            WIN.blit(self.image , self.rect)
+        if self.rect.bottom > HEIGHT:
+            self.rect.bottom = HEIGHT
+        WIN.blit(self.image , self.rect)
         return game_over
+    
+    def reset (self,x,y):
+            width_character = 40
+            height_character = 90
+            self.images_right = []
+            self.images_left = []
+            self.index = 0
+            self.counter = 0
+            self.image_jump = pygame.transform.scale(pygame.image.load(os.path.join("gojo_jump.png")),(width_character,height_character))
+            for num in range(1,7):
+                img_right = (pygame.image.load(os.path.join(f'GOJO{num}.png')))
+                img_right = pygame.transform.scale(img_right,(width_character , height_character))
+                img_left = pygame.transform.flip(img_right, True, False)
+                self.images_right.append(img_right)
+                self.images_left.append(img_left)
+            self.image = self.images_right[self.index]
+            self.dead_image = pygame.transform.scale(pygame.image.load(os.path.join('die_ghost.png')),(width_character, height_character))
+            self.rect = self.image.get_rect()
+            self.rect.x = x
+            self.rect.y = y
+            self.width= self.image.get_width()
+            self.height= self.image.get_height()
+            self.vel_y = 0
+            self.jumped = False
+            self.direction = 0
+            self.in_air = True
         
 #draws world
 class World():
@@ -256,13 +299,13 @@ world_data = [
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
-     [5,0,0,0,0,0,0,0,0,8,0,0,0,0,0,6],
-     [1,1,0,0,4,4,0,0,1,1,1,0,0,0,0,6],
+     [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
+     [1,1,0,0,4,4,0,0,8,0,0,0,0,0,0,6],
+     [5,0,0,0,0,0,0,3,3,3,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
-     [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
-     [5,0,0,0,0,0,0,0,0,0,0,0,0,4,4,4],
-     [5,0,0,0,0,0,0,0,8,0,0,0,0,0,0,6],
+     [5,0,0,0,0,0,0,0,0,0,0,4,4,4,0,4],
+     [5,0,0,0,0,0,0,0,8,0,4,0,0,0,0,6],
      [5,0,0,0,0,0,0,3,3,3,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6],
      [5,0,0,0,0,0,0,0,0,0,0,0,0,8,0,6],
@@ -272,9 +315,10 @@ world_data = [
 
 player = Player(100, 410)
 world = World(world_data)
-
-
-
+restart_button = button(WIDTH // 2 - 60 , HEIGHT // 2 , restart_image)
+start_button = button( 200,400  , start_img)
+end_button = button( 500 , 400  , end_img)
+score = 0
 
 
 #handles initiation
@@ -285,34 +329,29 @@ run = True
 while run:
     clock.tick(FPS)
     WIN.fill(WHITE)
-    WIN.blit(primary_background_image,(0, 0))  
-    world.draw()
-    enemy_group.update()
-    enemy_group.draw(WIN)
-    lava_group.draw(WIN)
-    game_over = player.update(game_over)
-    if game_over == -1:
-        WIN.blit(primary_background_image,(0, 0))  
+    WIN.blit(primary_background_image,(0, 0)) 
+    if main_menu == True:
+        if end_button.draw():
+            run = False
+        if start_button.draw():
+            main_menu = False
+               
+    else: 
         world.draw()
+        enemy_group.update()
+        enemy_group.draw(WIN)
         lava_group.draw(WIN)
-        game_over_text('GAME OVER!' , font_big, RED, 200 , 410)
-        game_over_text('Press "F" to Play Again' , font_small, RED, 250 , 500)
-        key = pygame.key.get_pressed()
-        if key[pygame.K_f]:
-            game_over = 0 
-            world.draw()
-            enemy_group.update()
-            enemy_group.draw(WIN)
-            lava_group.draw(WIN)
-            player = Player(100, 410)
-           
-           
-
-
-
-
-        
+        draw_text('Score: ' + str(score) , font_small, RED, 55 , 10)
+        game_over = player.update(game_over)
+        if game_over == -1:
+            if restart_button.draw():
+                player.reset(100, 410)
+                game_over = 0
+            if end_button.draw():
+                run = False   
     
+
+
     
     pygame.display.update()
     for event in pygame.event.get():
